@@ -2530,3 +2530,32 @@ func Test_CRecordInDescriptor(t *testing.T) {
 	require.NoError(err)
 	require.NoError(BuildAppDefs(schema, appdef.New()))
 }
+
+func Test_ErrorMessages(t *testing.T) {
+	require := assertions(t)
+	schema, err := require.AppSchema(`APPLICATION test();
+	WORKSPACE ClusterWS (
+
+	TABLE App INHERITS ODoc ();
+
+	TABLE App2 INHERITS ODoc ();
+
+	VIEW DeployedApps (
+		ClusterAppID int32,
+		DeployEventWLogOffset int64,
+		DeployEventWLogOffset2 int64,
+		DeployEventWLogOffset3 int64,
+		DeployEventWLogOffset4 int64,
+		Name string,
+		PRIMARY KEY ((ClusterAppID), Name)
+	) AS RESULT OF ApplyDeployApp;
+
+	EXTENSION ENGINE BUILTIN (
+		COMMAND DeployApp(App);
+		SYNC PROJECTOR ApplyDeployApp AFTER EXECUTE ON DeployApp INTENTS (View(DeployedApps));
+	);
+);
+`)
+	require.NoError(err)
+	require.NoError(BuildAppDefs(schema, appdef.New()))
+}
