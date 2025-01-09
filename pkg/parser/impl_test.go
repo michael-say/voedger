@@ -2201,6 +2201,22 @@ func Test_Grants(t *testing.T) {
 			);`, "file.vsql:9:5: GRANT follows REVOKE in the same container")
 	})
 
+	t.Run("ACL inheritance", func(t *testing.T) {
+		adf := require.Build(`APPLICATION test();
+			ABSTRACT WORKSPACE w0 (
+				ROLE role1;
+				TABLE Table1 INHERITS sys.CDoc(
+					Field1 int32
+				);
+				GRANT ALL ON TABLE Table1 TO role1;
+			);
+			WORKSPACE w1 INHERITS w0 ();`)
+		w1 := adf.Workspace(appdef.NewQName("pkg", "w0"))
+		require.NotNil(w1)
+		acl := slices.Collect(w1.ACL())
+		require.Len(acl, 1)
+	})
+
 	t.Run("GRANT Role", func(t *testing.T) {
 		schema, err := require.AppSchema(`APPLICATION test();
 			ABSTRACT WORKSPACE BaseWs (

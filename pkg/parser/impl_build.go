@@ -317,9 +317,9 @@ func (c *buildContext) grantsAndRevokes() error {
 
 	for _, schema := range c.app.Packages {
 		iteratePackageStmt(schema, &c.basicContext, func(w *WorkspaceStmt, ictx *iterateCtx) {
-			for _, inheritedWs := range w.inheritedWorkspaces {
-				handleWorkspace(inheritedWs.Statements)
-			}
+			// for _, inheritedWs := range w.inheritedWorkspaces {
+			// 	handleWorkspace(inheritedWs.Statements)
+			// }
 			handleWorkspace(w.Statements)
 		})
 	}
