@@ -6,6 +6,7 @@ package query2
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 
@@ -105,12 +106,20 @@ func (h *viewHandler) AuthorizeResult(ctx context.Context, qw *queryWork) error 
 	// }
 	return nil
 }
-
 func (h *viewHandler) RowsProcessor(ctx context.Context, qw *queryWork) (err error) {
+	err = h.validateFields(qw)
+	if err != nil {
+		return
+	}
 	oo := make([]*pipeline.WiredOperator, 0)
 	if len(qw.queryParams.Constraints.Order) != 0 || qw.queryParams.Constraints.Skip > 0 || qw.queryParams.Constraints.Limit > 0 {
 		oo = append(oo, pipeline.WireAsyncOperator("Aggregator", newAggregator(qw.queryParams)))
 	}
+	o, err := newFilter(qw)
+	if err != nil {
+		return
+	}
+	oo = append(oo, pipeline.WireAsyncOperator("Filter", o))
 	if len(qw.queryParams.Constraints.Keys) != 0 {
 		oo = append(oo, pipeline.WireAsyncOperator("Keys", newKeys(qw.queryParams.Constraints.Keys)))
 	}
@@ -119,14 +128,113 @@ func (h *viewHandler) RowsProcessor(ctx context.Context, qw *queryWork) (err err
 	return
 }
 func (h *viewHandler) Exec(ctx context.Context, qw *queryWork) (err error) {
-	kb := qw.appStructs.ViewRecords().KeyBuilder(qw.iView.QName())
-	kb.PutFromJSON(qw.queryParams.Constraints.Where)
-	return qw.appStructs.ViewRecords().Read(ctx, qw.msg.WSID(), kb, func(key istructs.IKey, value istructs.IValue) (err error) {
-		obj := objectBackedByMap{}
-		obj.data = coreutils.FieldsToMap(key, qw.appStructs.AppDef())
-		for k, v := range coreutils.FieldsToMap(value, qw.appStructs.AppDef()) {
-			obj.data[k] = v
+	kk, err := h.getKeys(qw)
+	if err != nil {
+		return
+	}
+	for i := range kk {
+		err = qw.appStructs.ViewRecords().Read(ctx, qw.msg.WSID(), kk[i], func(key istructs.IKey, value istructs.IValue) (err error) {
+			obj := objectBackedByMap{}
+			obj.data = coreutils.FieldsToMap(key, qw.appStructs.AppDef())
+			for k, v := range coreutils.FieldsToMap(value, qw.appStructs.AppDef()) {
+				obj.data[k] = v
+			}
+			return qw.callbackFunc(obj)
+		})
+		if err != nil {
+			return
 		}
-		return qw.callbackFunc(obj)
-	})
+	}
+	return
+}
+func (h *viewHandler) getKeys(qw *queryWork) (keys []istructs.IKeyBuilder, err error) {
+	view := qw.appStructs.AppDef().Type(qw.iView.QName()).(appdef.IView)
+
+	if qw.queryParams.Constraints == nil {
+		return nil, errConstraintsAreNull
+	}
+	if len(qw.queryParams.Constraints.Where) == 0 {
+		return nil, errWhereConstraintIsEmpty
+	}
+	if _, ok := qw.queryParams.Constraints.Where[view.Key().Fields()[0].Name()]; !ok {
+		return nil, errWhereConstraintMustHaveFirstMemberOfPrimaryKey
+	}
+
+	for _, field := range view.Key().Fields() {
+		intf := qw.queryParams.Constraints.Where[field.Name()]
+		switch intf.(type) {
+		case map[string]interface{}:
+			if len(keys) != 0 {
+				return
+			}
+			in, ok := intf.(map[string]interface{})["$in"]
+			if !ok {
+				return nil, errUnsupportedConstraint
+			}
+			params, ok := in.([]interface{})
+			if !ok {
+				return nil, errUnexpectedParams
+			}
+			for i := range params {
+				switch params[i].(type) {
+				case json.Number:
+					key := qw.appStructs.ViewRecords().KeyBuilder(qw.iView.QName())
+					key.PutNumber(field.Name(), params[i].(json.Number))
+					keys = append(keys, key)
+				case string:
+					key := qw.appStructs.ViewRecords().KeyBuilder(qw.iView.QName())
+					key.PutString(field.Name(), params[i].(string))
+					keys = append(keys, key)
+				default:
+					return nil, errUnsupportedType
+				}
+			}
+		case json.Number:
+			if len(keys) == 0 {
+				key := qw.appStructs.ViewRecords().KeyBuilder(qw.iView.QName())
+				key.PutNumber(field.Name(), intf.(json.Number))
+				keys = append(keys, key)
+			} else {
+				keys[0].PutNumber(field.Name(), intf.(json.Number))
+			}
+		case string:
+			if len(keys) == 0 {
+				key := qw.appStructs.ViewRecords().KeyBuilder(qw.iView.QName())
+				key.PutString(field.Name(), intf.(string))
+				keys = append(keys, key)
+			} else {
+				keys[0].PutString(field.Name(), intf.(string))
+			}
+		case nil:
+			return
+		default:
+			return nil, errUnsupportedType
+		}
+	}
+
+	return
+}
+func (h *viewHandler) validateFields(qw *queryWork) (err error) {
+	view := qw.appStructs.AppDef().Type(qw.iView.QName()).(appdef.IView)
+
+	if qw.queryParams.Constraints == nil {
+		return errConstraintsAreNull
+	}
+	if len(qw.queryParams.Constraints.Where) == 0 {
+		return errWhereConstraintIsEmpty
+	}
+	if _, ok := qw.queryParams.Constraints.Where[view.Key().Fields()[0].Name()]; !ok {
+		return errWhereConstraintMustHaveFirstMemberOfPrimaryKey
+	}
+
+	ff := make(map[string]bool)
+	for _, field := range view.Fields() {
+		ff[field.Name()] = true
+	}
+	for k := range qw.queryParams.Constraints.Where {
+		if !ff[k] {
+			return fmt.Errorf("%w: '%s'", errUnexpectedField, k)
+		}
+	}
+	return
 }
