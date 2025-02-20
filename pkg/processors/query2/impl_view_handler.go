@@ -148,19 +148,7 @@ func (h *viewHandler) Exec(ctx context.Context, qw *queryWork) (err error) {
 	return
 }
 func (h *viewHandler) getKeys(qw *queryWork) (keys []istructs.IKeyBuilder, err error) {
-	view := qw.appStructs.AppDef().Type(qw.iView.QName()).(appdef.IView)
-
-	if qw.queryParams.Constraints == nil {
-		return nil, errConstraintsAreNull
-	}
-	if len(qw.queryParams.Constraints.Where) == 0 {
-		return nil, errWhereConstraintIsEmpty
-	}
-	if _, ok := qw.queryParams.Constraints.Where[view.Key().Fields()[0].Name()]; !ok {
-		return nil, errWhereConstraintMustHaveFirstMemberOfPrimaryKey
-	}
-
-	for _, field := range view.Key().Fields() {
+	for _, field := range qw.appStructs.AppDef().Type(qw.iView.QName()).(appdef.IView).Key().Fields() {
 		intf := qw.queryParams.Constraints.Where[field.Name()]
 		switch intf.(type) {
 		case map[string]interface{}:
@@ -224,7 +212,7 @@ func (h *viewHandler) validateFields(qw *queryWork) (err error) {
 		return errWhereConstraintIsEmpty
 	}
 	if _, ok := qw.queryParams.Constraints.Where[view.Key().Fields()[0].Name()]; !ok {
-		return errWhereConstraintMustHaveFirstMemberOfPrimaryKey
+		return errWhereConstraintMustHaveFirstMemberOfThePartitionKey
 	}
 
 	ff := make(map[string]bool)
