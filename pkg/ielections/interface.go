@@ -2,13 +2,14 @@
  * Copyright (c) 2025-present unTill Software Development Group B.V.
  * @author Alisher Nurmanov
  */
-package elections
+package ielections
 
 import (
 	"context"
 )
 
 // IElections has AcquireLeadership returning nil if leadership is not acquired or error.
+// [~server.design.orch/IElections~impl]
 type IElections[K any, V any] interface {
 	// AcquireLeadership attempts to become leader for `key` with `val`.
 	//  - Returns a non-nil context if leadership is acquired successfully.
@@ -22,6 +23,7 @@ type IElections[K any, V any] interface {
 }
 
 // ITTLStorage defines a TTL-based storage layer with explicit durations.
+// [~server.design.orch/ITTLStorage~impl]
 type ITTLStorage[K any, V any] interface {
 	// InsertIfNotExist tries to insert (key, val) with a TTL only if key does not exist.
 	// Returns (true, nil) if inserted successfully,
@@ -38,4 +40,7 @@ type ITTLStorage[K any, V any] interface {
 	// and if they match, deletes the key, returning (true, nil). Otherwise, (false, nil).
 	// On storage error, returns (false, err).
 	CompareAndDelete(key K, val V) (bool, error)
+
+	// used in tests only
+	Get(key K) (ok bool, val V, err error)
 }

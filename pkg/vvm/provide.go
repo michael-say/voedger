@@ -75,6 +75,7 @@ import (
 	"github.com/voedger/voedger/pkg/vvm/storage"
 )
 
+// [~server.design.orch/VVM.Provide~impl]
 func Provide(vvmCfg *VVMConfig) (voedgerVM *VoedgerVM, err error) {
 	vvmCtx, vvmCtxCancel := context.WithCancel(context.Background())
 	problemCtx, problemCtxCancel := context.WithCancel(context.Background())
@@ -227,7 +228,7 @@ func wireVVM(vvmCtx context.Context, vvmConfig *VVMConfig) (*VVM, func(), error)
 }
 
 func provideIVVMAppTTLStorage(prov istorage.IAppStorageProvider) (storage.ISysVvmStorage, error) {
-	return prov.AppStorage(appdef.NewAppQName(istructs.SysOwner, "vvm"))
+	return prov.AppStorage(istructs.AppQName_sys_vvm)
 }
 
 func provideWLimiterFactory(maxSize iblobstorage.BLOBMaxSizeType) blobprocessor.WLimiterFactory {
