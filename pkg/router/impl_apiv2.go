@@ -98,6 +98,12 @@ func (s *httpService) registerHandlersV2() {
 		corsHandler(requestHandlerV2_auth_login(s.requestSender, s.numsAppsWorkspaces))).
 		Methods(http.MethodPost).Name("auth login")
 
+	// auth/login: /api/v2/apps/{owner}/{app}/auth/refresh
+	// [~server.apiv2.auth/cmp.routerRefreshPathHandler~impl]
+	s.router.HandleFunc(fmt.Sprintf("/api/v2/users/{%s}/apps/{%s}/auth/refresh",
+		URLPlaceholder_appOwner, URLPlaceholder_appName),
+		corsHandler(requestHandlerV2_auth_refresh(s.requestSender, s.numsAppsWorkspaces))).
+		Methods(http.MethodPost).Name("auth refresh")
 }
 
 func requestHandlerV2_schemas(reqSender bus.IRequestSender, numsAppsWorkspaces map[appdef.AppQName]istructs.NumAppWorkspaces) http.HandlerFunc {
@@ -124,6 +130,41 @@ func requestHandlerV2_schemas_wsRoles(reqSender bus.IRequestSender, numsAppsWork
 		busRequest.WorkspaceQName = appdef.NewQName(vars[URLPlaceholder_pkg], vars[URLPlaceholder_workspace])
 		sendRequestAndReadResponse(req, busRequest, reqSender, rw)
 	}
+}
+
+func requestHandlerV2_auth_refresh(reqSender bus.IRequestSender, numsAppsWorkspaces map[appdef.AppQName]istructs.NumAppWorkspaces) http.HandlerFunc {
+	return func(rw http.ResponseWriter, req *http.Request) {
+		busRequest, ok := createBusRequest(req.Method, req, rw, numsAppsWorkspaces)
+		if !ok {
+			return
+		}
+
+		var login, password string
+		var err error
+
+		originalAppName := busRequest.AppQName
+
+		// [~server.apiv2.auth/cmp.routerLoginPathHandler.pseudoWSID~impl]
+		if busRequest.WSID, login, password, err = getPseudoWSIDFromAuthRequest(busRequest, numsAppsWorkspaces); err != nil {
+			WriteJSONResponse(rw, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		busRequest.IsAPIV2 = true
+		busRequest.APIPath = int(processors.APIPath_Auth_Login)
+		busRequest.AppQName = istructs.AppQName_sys_registry
+		busRequest.WorkspaceQName = qNameAppWorkspaceWS
+		busRequest.Method = http.MethodGet
+		busRequest.QName = qNameIssuePrincipalToken
+		queryParams := map[string]string{}
+		queryParams["arg"] = fmt.Sprintf(`{"Login": "%s","Password": "%s","AppName": "%s"}`, login, password, originalAppName)
+		busRequest.Query = queryParams
+		sendRequestAndReadResponse(req, busRequest, reqSender, rw)
+	}
+}
+
+func getProfileWSIDFromAuthRequest(req bus.Request) (istructs.WSID, error) {
+	auth := req.Header[coreutils.Authorization]
 }
 
 func requestHandlerV2_auth_login(reqSender bus.IRequestSender, numsAppsWorkspaces map[appdef.AppQName]istructs.NumAppWorkspaces) http.HandlerFunc {
