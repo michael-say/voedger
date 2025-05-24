@@ -1,1 +1,3 @@
 Resolves issue 'BLOB fields: generate OpenAPI endoints'
+
+Resolves #3664 BLOB fields: generate OpenAPI endoints
