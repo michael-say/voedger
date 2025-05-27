@@ -1,1 +1,3 @@
 Resolves issue 'parser: CDoc may not refer WDoc'
+
+Resolves #3705 parser: CDoc may not refer WDoc
