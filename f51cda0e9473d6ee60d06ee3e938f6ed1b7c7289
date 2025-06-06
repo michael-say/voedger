@@ -1,1 +1,3 @@
 Resolves issue 'login: status when wsid == 0'
+
+Resolves #3756 login: status when wsid == 0
