@@ -1,1 +1,3 @@
 Resolves issue 'parser: wrong error message on missing `RETURNS`'
+
+Resolves #2334 parser: wrong error message on missing `RETURNS`
