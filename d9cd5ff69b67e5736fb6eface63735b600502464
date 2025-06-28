@@ -1,0 +1,1 @@
+Resolves issue '`sys.SendMail`: allow sending mails with `GET` operation'
