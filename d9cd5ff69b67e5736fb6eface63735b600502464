@@ -1,1 +1,3 @@
 Resolves issue '`sys.SendMail`: allow sending mails with `GET` operation'
+
+Resolves #3858 `sys.SendMail`: allow sending mails with `GET` operation
